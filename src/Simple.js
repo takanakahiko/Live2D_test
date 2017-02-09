@@ -1,14 +1,12 @@
 // JavaScriptで発生したエラーを取得
 window.onerror = function (msg, url, line, col, error) {
-    'use strict';
+    
     var errmsg = "file:" + url + "<br>line:" + line + " " + msg;
     Simple.myerror(errmsg);
 };
 
-var Simple = function() {
+var Simple = function () {
     
-    this.live2DModel;
-
     /*
     * Live2Dモデルのインスタンス
     */
@@ -34,20 +32,33 @@ var Simple = function() {
     */
     this.loadedImages = [];
     
-    /*
+    this.motions = [];      // モーション配列
+    this.motionMgr = null;  // モーションマネジャー
+    this.motionnm = 0;      // モーション番号
+    this.sounds = [];       // サウンド配列
+    this.soundnum = 0;      // サウンド番号
+    /**
     * Live2D モデル設定。
     */
     this.modelDef = {
-        
-        "type":"Live2D Model Setting",
-        "name":"haru",
-        "model":"../LIB/Live2D_SDK_WebGL_2.0.05_1_jp/sample/Simple/assets/haru/haru.moc",
-        "textures":[
+        "type" : "Live2D Model Setting",
+        "name" : "haru",
+        "model" : "../LIB/Live2D_SDK_WebGL_2.0.05_1_jp/sample/Simple/assets/haru/haru.moc",
+        "textures" : [
             "../LIB/Live2D_SDK_WebGL_2.0.05_1_jp/sample/Simple/assets/haru/haru.1024/texture_00.png",
             "../LIB/Live2D_SDK_WebGL_2.0.05_1_jp/sample/Simple/assets/haru/haru.1024/texture_01.png",
             "../LIB/Live2D_SDK_WebGL_2.0.05_1_jp/sample/Simple/assets/haru/haru.1024/texture_02.png"
+        ],
+        "motions" : [
+            "../LIB/Live2D_SDK_WebGL_2.0.05_1_jp/sample/SampleApp1/assets/live2d/haru/motions/idle_02.mtn",
+            "../LIB/Live2D_SDK_WebGL_2.0.05_1_jp/sample/SampleApp1/assets/live2d/haru/motions/tapBody_03.mtn",
+            "../LIB/Live2D_SDK_WebGL_2.0.05_1_jp/sample/SampleApp1/assets/live2d/haru/motions/tapBody_02.mtn"
+        ],
+        "sounds" : [
+            "../LIB/Live2D_SDK_WebGL_2.0.05_1_jp/sample/SampleApp1/assets/live2d/haru/sounds/tapBody_02.mp3"
         ]
     };
+    
     
     // Live2Dの初期化
     Live2D.init();
@@ -58,21 +69,21 @@ var Simple = function() {
 
 	// コンテキストを失ったとき
     
-	canvas.addEventListener("webglcontextlost", function(e) {
+	canvas.addEventListener("webglcontextlost", function (e) {
         Simple.myerror("context lost");
         loadLive2DCompleted = false;
         initLive2DCompleted = false;
         
-        var cancelAnimationFrame = 
-            window.cancelAnimationFrame || 
+        var cancelAnimationFrame =
+            window.cancelAnimationFrame ||
             window.mozCancelAnimationFrame;
         cancelAnimationFrame(requestID); //アニメーションを停止
         
-        e.preventDefault(); 
+        e.preventDefault();
     }, false);
     
     // コンテキストが復元されたとき
-	canvas.addEventListener("webglcontextrestored" , function(e){
+	canvas.addEventListener("webglcontextrestored" , function (e) {
         Simple.myerror("webglcontext restored");
         Simple.initLoop(canvas); 
     }, false);
@@ -86,13 +97,12 @@ var Simple = function() {
 * WebGLコンテキストを取得・初期化。
 * Live2Dの初期化、描画ループを開始。
 */
-Simple.initLoop = function(canvas/*HTML5 canvasオブジェクト*/) 
-{
+Simple.initLoop = function (canvas/*HTML5 canvasオブジェクト*/) {
     //------------ WebGLの初期化 ------------
     
 	// WebGLのコンテキストを取得する
     var para = {
-        premultipliedAlpha : true,
+        premultipliedAlpha : true//,
 //        alpha : false
     };
 	var gl = Simple.getWebGLContext(canvas, para);
@@ -102,12 +112,12 @@ Simple.initLoop = function(canvas/*HTML5 canvasオブジェクト*/)
     }
 
 	// 描画エリアを白でクリア
-	gl.clearColor( 0.0 , 0.0 , 0.0 , 0.0 );	 
+	gl.clearColor( 0.0 , 0.0 , 0.0 , 0.0 ); 
 
     //------------ Live2Dの初期化 ------------
     
 	// mocファイルからLive2Dモデルのインスタンスを生成
-	Simple.loadBytes(modelDef.model, function(buf){
+	Simple.loadBytes(modelDef.model, function (buf){
 		live2DModel = Live2DModelWebGL.loadModel(buf);
 	});
 
@@ -121,15 +131,27 @@ Simple.initLoop = function(canvas/*HTML5 canvasオブジェクト*/)
 				if((++loadCount) == modelDef.textures.length) {
                     loadLive2DCompleted = true;//全て読み終わった
                 }
-			}
+			};
 			loadedImages[tno].onerror = function() { 
 				Simple.myerror("Failed to load image : " + modelDef.textures[tno]); 
-			}
+			};
 		})( i );
 	}
     
-	//------------ 描画ループ ------------
-    
+	// モーションの読み込み
+    for(var j = 0; j < modelDef.motions.length; j++){
+        Simple.loadBytes(modelDef.motions[j], function(buf){
+            motions.push(new Live2DMotion.loadMotion(buf));
+        });
+    }
+    motionMgr = new L2DMotionManager();
+
+    // サウンドの読み込み
+    for(var k = 0; k < modelDef.sounds.length; k++){
+        sounds.push(new Sound(modelDef.sounds[k]));
+    }
+    //------------ 描画ループ ------------
+
     (function tick() {
         Simple.draw(gl); // 1回分描画
         
@@ -176,11 +198,23 @@ Simple.draw = function(gl/*WebGLコンテキスト*/)
         live2DModel.setMatrix(matrix4x4);
 	}
     
-	// キャラクターのパラメータを適当に更新
-    var t = UtSystem.getTimeMSec() * 0.001 * 2 * Math.PI; //1秒ごとに2π(1周期)増える
-    var cycle = 3.0; //パラメータが一周する時間(秒)
-    // PARAM_ANGLE_Xのパラメータが[cycle]秒ごとに-30から30まで変化する
-    live2DModel.setParamFloat("PARAM_ANGLE_X", 30 * Math.sin(t/cycle));
+	// モーションが終了 または アイドルモーション以外ならモーション再生
+    if(motionMgr.isFinished() || motionnm != 0){
+        // モーションの再生
+        motionMgr.startMotion(motions[motionnm]);
+        // 前回のサウンド0停止
+        this.SoundStop(0);
+        // モーション2の場合、サウンド0を再生
+        switch(motionnm){
+            case 2:
+                // サウンド0再生
+                this.SoundPlay(0);
+                break;
+        }
+        motionnm = 0;
+    }
+    // モーションマネジャーの更新
+    motionMgr.updateParam(live2DModel);
 
     
     // Live2Dモデルを更新して描画
@@ -281,3 +315,34 @@ Simple.myerror = function(msg/*string*/)
     console.error(msg);
 	Simple.mylog( "<span style='color:red'>" + msg + "</span>");
 };
+
+/*
+ * モーション切り替え
+ */
+Simple.motionChange = function(num){
+    motionnm = num;
+}
+
+/**
+* サウンド管理クラス
+*/
+var Sound = function (path) {
+    this.snd = document.createElement("audio");
+    this.snd.src = path;
+};
+/*
+ * サウンド再生
+ */
+Simple.SoundPlay = function(num){
+    sounds[num].snd.play();
+}
+/*
+ * サウンド停止
+ */
+Simple.SoundStop = function(num){
+    // サウンドが再生中ならとめる
+    if(sounds[num].snd.paused == false){
+        sounds[num].snd.pause();
+        sounds[num].snd.currentTime = 0;
+    }
+}
