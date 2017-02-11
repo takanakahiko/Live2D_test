@@ -1,42 +1,35 @@
 // JavaScriptで発生したエラーを取得
 window.onerror = function (msg, url, line, col, error) {
-    
     var errmsg = "file:" + url + "<br>line:" + line + " " + msg;
     Simple.myerror(errmsg);
 };
 
+var mousePos = {x:0.5, y:0.5};
+var canvas = document.getElementById("glcanvas");
+canvas.addEventListener('mousemove', function(e){
+    var rect = e.target.getBoundingClientRect();
+    x = e.clientX - rect.left;
+    y = e.clientY - rect.top;
+    currentX = x / rect.width;
+    currentY = y / rect.height;
+    mousePos.x += ((currentX - mousePos.x) / 20);
+    mousePos.y += ((currentY - mousePos.y) / 20);
+});
+
 var Simple = function () {
     
-    /*
-    * Live2Dモデルのインスタンス
-    */
-    this.live2DModel = null;
-    
-    /*
-    * アニメーションを停止するためのID
-    */
-    this.requestID = null;
-    
-    /*
-    * モデルのロードが完了したら true
-    */
-    this.loadLive2DCompleted = false;
-    
-    /*
-    * モデルの初期化が完了したら true
-    */
-    this.initLive2DCompleted = false;
-    
-    /*
-    * WebGL Image型オブジェクトの配列
-    */
-    this.loadedImages = [];
-    
+    this.live2DModel = null; //Live2Dモデルのインスタンス
+    this.requestID = null; //アニメーションを停止するためのID
+    this.loadLive2DCompleted = false; //モデルのロードが完了したら true
+    this.initLive2DCompleted = false; //モデルの初期化が完了したら true
+    this.loadedImages = []; //WebGL Image型オブジェクトの配列
     this.motions = [];      // モーション配列
     this.motionMgr = null;  // モーションマネジャー
     this.motionnm = 0;      // モーション番号
     this.sounds = [];       // サウンド配列
     this.soundnum = 0;      // サウンド番号
+    this.isIdle = true;
+    
     /**
     * Live2D モデル設定。
     */
@@ -204,18 +197,30 @@ Simple.draw = function(gl/*WebGLコンテキスト*/)
         motionMgr.startMotion(motions[motionnm]);
         // 前回のサウンド0停止
         this.SoundStop(0);
-        // モーション2の場合、サウンド0を再生
         switch(motionnm){
-            case 2:
-                // サウンド0再生
-                this.SoundPlay(0);
+            case 2: //モーション2の場合
+                this.SoundPlay(0); // サウンド0再生
                 break;
         }
+        this.isIdle = (motionnm == 0);
         motionnm = 0;
     }
     // モーションマネジャーの更新
     motionMgr.updateParam(live2DModel);
-
+    
+    // キャラクターのパラメータを適当に更新
+    var t = UtSystem.getTimeMSec() * 0.001 * 2 * Math.PI; //1秒ごとに2π(1周期)増える
+    var cycle = 3.0; //パラメータが一周する時間(秒)
+    // PARAM_ANGLE_Xのパラメータが[cycle]秒ごとに-30から30まで変化する
+    //live2DModel.setParamFloat("PARAM_ANGLE_X", 30 * Math.sin(t/cycle));
+    
+    
+    if(this.isIdle){
+        live2DModel.setParamFloat("PARAM_ANGLE_X", 40 * (mousePos.x - 0.5));
+        live2DModel.setParamFloat("PARAM_ANGLE_Y", 40 * (0.5 - mousePos.y));
+        live2DModel.setParamFloat("PARAM_EYE_BALL_X", mousePos.x - 0.5);
+        live2DModel.setParamFloat("PARAM_EYE_BALL_Y", 0.5 - mousePos.y);
+    }    
     
     // Live2Dモデルを更新して描画
     live2DModel.update(); // 現在のパラメータに合わせて頂点等を計算
