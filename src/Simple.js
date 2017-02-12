@@ -220,7 +220,7 @@ Simple.draw = function(gl/*WebGLコンテキスト*/)
         live2DModel.setParamFloat("PARAM_ANGLE_Y", 40 * (0.5 - mousePos.y));
         live2DModel.setParamFloat("PARAM_EYE_BALL_X", mousePos.x - 0.5);
         live2DModel.setParamFloat("PARAM_EYE_BALL_Y", 0.5 - mousePos.y);
-    }    
+    }
     
     // Live2Dモデルを更新して描画
     live2DModel.update(); // 現在のパラメータに合わせて頂点等を計算
